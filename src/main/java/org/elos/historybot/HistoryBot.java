@@ -104,6 +104,9 @@ public class HistoryBot implements SpringLongPollingBot, LongPollingSingleThread
             case "Дати":
                 handleAdditionalCommands(chatId, "Дати");
                 break;
+            case "Козацькі угоди":
+                sendKozatskiYgodu(chatId);
+                break;
         }
         if (command.startsWith("Тема ")) {
             handleTopic(chatId, Integer.parseInt(command.split(" ")[1]));
@@ -217,10 +220,20 @@ public class HistoryBot implements SpringLongPollingBot, LongPollingSingleThread
                             .text("Назад ◀\uFE0F")
                             .build()
             );
+
             keyboardRows.add(keyboardRow);
             keyboardRows.add(keyboardRow2);
             keyboardRows.add(keyboardRow3);
+            if (topicNumber > 7 && topicNumber < 12) {
+                keyboardRows.add(new KeyboardRow(
+                        KeyboardButton.builder()
+                                .text("Козацькі угоди")
+                                .build()
+                ));
+
+            }
             keyboardRows.add(keyboardRow4);
+
             ReplyKeyboardMarkup markup = ReplyKeyboardMarkup.builder()
                     .keyboard(keyboardRows).build();
 
@@ -255,25 +268,38 @@ public class HistoryBot implements SpringLongPollingBot, LongPollingSingleThread
     }
 
     private List<File> extractImagesFromPDF(Long chatId, int topicNumber, String type) {
-        String filePath = getFilePath(topicNumber, type, false);
+        String filePath = getFilePath(topicNumber, type, false, true);
         System.out.println(filePath);
-
-        // Determine if the resource exists by checking its availability as an InputStream
         ClassPathResource resource = new ClassPathResource(filePath);
-        try (InputStream inputStream = resource.getInputStream()) {
-            // If the first resource is not found, switch to the fallback path
-            if (inputStream.available() == 0) {
-                filePath = getFilePath(topicNumber, type, true);
+
+        // Check if the resource exists. If not, switch to the alternative path.
+        try {
+            if (!resource.exists() && type == "Персоналії") {
+                filePath = getFilePath(topicNumber, type, false, false);
                 resource = new ClassPathResource(filePath);
+                if (!resource.isFile()) {
+                    filePath = getFilePath(topicNumber, type, true, false);
+                    resource = new ClassPathResource(filePath);
+                    if (!resource.exists() || !resource.getFile().exists()) {
+                        filePath = getFilePath(topicNumber, type, true, true);
+                        resource = new ClassPathResource(filePath);
+                    }
+                }
             }
-        } catch (IOException e) {
+            if (!resource.exists()) {
+                filePath = getFilePath(topicNumber, type, true, false);
+                resource = new ClassPathResource(filePath);
+                System.out.println(filePath);
+
+            }
+
+        } catch (Exception e) {
             sendMsg(chatId, "\uD83D\uDE22 На жаль, нам не вдалося отримати " + type.toLowerCase() + " для теми " + topicNumber);
             throw new RuntimeException(e);
         }
 
         List<File> imageFiles = new ArrayList<>();
 
-        // Proceed with processing the PDF if the resource is found
         try (InputStream pdfStream = resource.getInputStream()) {
             try (PDDocument document = PDDocument.load(pdfStream)) {
                 PDFRenderer pdfRenderer = new PDFRenderer(document);
@@ -295,31 +321,93 @@ public class HistoryBot implements SpringLongPollingBot, LongPollingSingleThread
             sendPdfToUser(chatId, filePath);
         } catch (IOException e) {
             sendMsg(chatId, "\uD83D\uDE22 На жаль, нам не вдалося отримати " + type.toLowerCase() + " для теми " + topicNumber);
-            e.printStackTrace();
+            System.out.println(e.getMessage());
         }
 
         return imageFiles;
     }
 
-    private String getFilePath(int topicNumber, String type, boolean intensive) {
-        int numberOfLession;
-        if ((topicNumber == 1 || topicNumber == 2) && (type == "Дати" || type == "Пам_ятки" || type == "Поняття")) {
-            String path = String.format("Полтавцев/Заняття 1/%s. Тема 1-2.pdf", type);
-            return path;
+    private void sendKozatskiYgodu(Long chatId) {
+        String filePath = "Полтавцев/Заняття 3/Козацькі угоди.pdf";
+        sendPdfToUser(chatId, filePath);
+
+        ClassPathResource resource = new ClassPathResource(filePath);
+
+        List<File> imageFiles = new ArrayList<>();
+
+        try (InputStream pdfStream = resource.getInputStream()) {
+            try (PDDocument document = PDDocument.load(pdfStream)) {
+                PDFRenderer pdfRenderer = new PDFRenderer(document);
+                for (int page = 0; page < document.getNumberOfPages(); page++) {
+                    BufferedImage image = pdfRenderer.renderImageWithDPI(page, 300); // Render page to image
+
+                    // Compress image to appropriate size
+                    BufferedImage compressedImage = Thumbnails.of(image)
+                            .size(2048, 2048) // Set max resolution
+                            .outputQuality(0.7) // Set quality from 0 to 1
+                            .asBufferedImage();
+
+                    // Save the image as a temporary file
+                    File imageFile = new File("temp_image_" + page + ".png");
+                    ImageIO.write(compressedImage, "png", imageFile);
+                    imageFiles.add(imageFile);
+                }
+            }
+        } catch (IOException e) {
+            sendMsg(chatId, "\uD83D\uDE22 На жаль, нам не вдалося отримати Козацькі угоди");
+            System.out.println(e.getMessage());
         }
-        if (topicNumber >= 1 && topicNumber <= 4) numberOfLession = 1;
-        else if (topicNumber >= 5 && topicNumber <= 7) numberOfLession = 2;
-        else if (topicNumber >= 8 && topicNumber <= 11) numberOfLession = 3;
-        else if (topicNumber >= 12 && topicNumber <= 14) numberOfLession = 4;
-        else if (topicNumber >= 15 && topicNumber <= 17) numberOfLession = 5;
-        else if (topicNumber >= 18 && topicNumber <= 20) numberOfLession = 6;
-        else if (topicNumber >= 21 && topicNumber <= 22) numberOfLession = 7;
-        else if (topicNumber >= 23 && topicNumber <= 25) numberOfLession = 8;
-        else if (topicNumber >= 26 && topicNumber <= 28) numberOfLession = 9;
-        else if (topicNumber >= 29 && topicNumber <= 32) numberOfLession = 10;
-        else numberOfLession = 1;
+        sendImageAlbum(chatId, imageFiles, "Козацькі угоди");
+    }
+
+    private String getFilePath(int topicNumber, String type, boolean intensive, boolean nopersonalii) {
+        int numberOfLesson;
+
+        // Проверяем и формируем путь для типа "Персоналії"
+        if (type.equals("Персоналії")) {
+            String intens = intensive ? ". Інтенсив" : "";
+            String path = String.format("Полтавцев/Заняття %d/Персоналії. Тема %d%s.pdf", getLessonNumber(topicNumber), topicNumber, intens);
+            if (nopersonalii) {
+                return replaceDiacriticsInPersonal(path);
+            }
+            return path;
+            // Проверяем путь с заменой буквы і на ї
+        }
+
+        // Формируем путь для специальных типов (Дати, Пам'ятки, Поняття)
+        if ((topicNumber == 1 || topicNumber == 2) && (type.equals("Дати") || type.equals("Пам_ятки") || type.equals("Поняття"))) {
+            return String.format("Полтавцев/Заняття 1/%s. Тема 1-2.pdf", type);
+        }
+
+        // Определяем номер занятия
+        numberOfLesson = getLessonNumber(topicNumber);
+
+        // Формируем стандартный путь
         String intens = intensive ? ". Інтенсив" : "";
-        String path = String.format("Полтавцев/Заняття %d/%s. Тема " + topicNumber + "%s.pdf", numberOfLession, type, intens);
+        return String.format("Полтавцев/Заняття %d/%s. Тема %d%s.pdf", numberOfLesson, type, topicNumber, intens);
+    }
+
+    // Метод для определения номера занятия
+    private int getLessonNumber(int topicNumber) {
+        if (topicNumber >= 1 && topicNumber <= 4) return 1;
+        else if (topicNumber >= 5 && topicNumber <= 7) return 2;
+        else if (topicNumber >= 8 && topicNumber <= 11) return 3;
+        else if (topicNumber >= 12 && topicNumber <= 14) return 4;
+        else if (topicNumber >= 15 && topicNumber <= 17) return 5;
+        else if (topicNumber >= 18 && topicNumber <= 20) return 6;
+        else if (topicNumber >= 21 && topicNumber <= 22) return 7;
+        else if (topicNumber >= 23 && topicNumber <= 25) return 8;
+        else if (topicNumber >= 26 && topicNumber <= 28) return 9;
+        else if (topicNumber >= 29 && topicNumber <= 32) return 10;
+        else return 1;
+    }
+
+    // Метод для замены буквы 'і' на 'ї' в слове "Персоналії"
+    private String replaceDiacriticsInPersonal(String path) {
+        // Заменяем букву 'і' на 'ї' только в случае, если слово "Персоналії" в пути
+        if (path.contains("Персоналії")) {
+            path = path.replace("Персоналії", "Персоналії");
+        }
         return path;
     }
 
