@@ -133,6 +133,7 @@ public class HistoryBot implements SpringLongPollingBot, LongPollingSingleThread
     private void handleAdditionalCommands(Long chatId, String type) {
         int selectedTopic = userService.findByChatId(chatId).getSelectedTopic();
         List<File> images = extractImagesFromPDF(chatId, selectedTopic, type);
+        //new comment
 //        if (!images.isEmpty()) {
 //            sendImageAlbum(chatId, images, String.format("Тема " + selectedTopic + ". %s.", type));
 //            for (File image : images) {
