@@ -133,12 +133,12 @@ public class HistoryBot implements SpringLongPollingBot, LongPollingSingleThread
     private void handleAdditionalCommands(Long chatId, String type) {
         int selectedTopic = userService.findByChatId(chatId).getSelectedTopic();
         List<File> images = extractImagesFromPDF(chatId, selectedTopic, type);
-        if (!images.isEmpty()) {
-            sendImageAlbum(chatId, images, String.format("Тема " + selectedTopic + ". %s.", type));
-            for (File image : images) {
-                image.delete();
-            }
-        }
+//        if (!images.isEmpty()) {
+//            sendImageAlbum(chatId, images, String.format("Тема " + selectedTopic + ". %s.", type));
+//            for (File image : images) {
+//                image.delete();
+//            }
+//        }
     }
 
     private void handleViewTopics(Long chatId) {
@@ -299,30 +299,30 @@ public class HistoryBot implements SpringLongPollingBot, LongPollingSingleThread
         }
 
         List<File> imageFiles = new ArrayList<>();
-
-        try (InputStream pdfStream = resource.getInputStream()) {
-            try (PDDocument document = PDDocument.load(pdfStream)) {
-                PDFRenderer pdfRenderer = new PDFRenderer(document);
-                for (int page = 0; page < document.getNumberOfPages(); page++) {
-                    BufferedImage image = pdfRenderer.renderImageWithDPI(page, 350); // Render page to image
-
-                    // Compress image to appropriate size
-                    BufferedImage compressedImage = Thumbnails.of(image)
-                            .size(2048, 2048) // Set max resolution
-                            .outputQuality(0.8) // Set quality from 0 to 1
-                            .asBufferedImage();
-
-                    // Save the image as a temporary file
-                    File imageFile = new File("temp_image_" + page + ".png");
-                    ImageIO.write(compressedImage, "png", imageFile);
-                    imageFiles.add(imageFile);
-                }
-            }
-            sendPdfToUser(chatId, filePath);
-        } catch (IOException e) {
-            sendMsg(chatId, "\uD83D\uDE22 На жаль, нам не вдалося отримати " + type.toLowerCase() + " для теми " + topicNumber);
-            System.out.println(e.getMessage());
-        }
+//
+//        try (InputStream pdfStream = resource.getInputStream()) {
+//            try (PDDocument document = PDDocument.load(pdfStream)) {
+//                PDFRenderer pdfRenderer = new PDFRenderer(document);
+//                for (int page = 0; page < document.getNumberOfPages(); page++) {
+//                    BufferedImage image = pdfRenderer.renderImageWithDPI(page, 350); // Render page to image
+//
+//                    // Compress image to appropriate size
+//                    BufferedImage compressedImage = Thumbnails.of(image)
+//                            .size(2048, 2048) // Set max resolution
+//                            .outputQuality(0.8) // Set quality from 0 to 1
+//                            .asBufferedImage();
+//
+//                    // Save the image as a temporary file
+//                    File imageFile = new File("temp_image_" + page + ".png");
+//                    ImageIO.write(compressedImage, "png", imageFile);
+//                    imageFiles.add(imageFile);
+//                }
+//            }
+//        } catch (IOException e) {
+//            sendMsg(chatId, "\uD83D\uDE22 На жаль, нам не вдалося отримати " + type.toLowerCase() + " для теми " + topicNumber);
+//            System.out.println(e.getMessage());
+//        }
+        sendPdfToUser(chatId, filePath);
 
         return imageFiles;
     }
