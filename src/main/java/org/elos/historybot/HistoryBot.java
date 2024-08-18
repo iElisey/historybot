@@ -299,6 +299,12 @@ public class HistoryBot implements SpringLongPollingBot, LongPollingSingleThread
             throw new RuntimeException(e);
         }
 
+        try {
+            resource.getInputStream();
+        } catch (IOException e) {
+            sendMsg(chatId, "\uD83D\uDE22 На жаль, нам не вдалося отримати " + type.toLowerCase() + " для теми " + topicNumber);
+            throw new RuntimeException(e);
+        }
         List<File> imageFiles = new ArrayList<>();
 //
 //        try (InputStream pdfStream = resource.getInputStream()) {
@@ -331,34 +337,34 @@ public class HistoryBot implements SpringLongPollingBot, LongPollingSingleThread
     private void sendKozatskiYgodu(Long chatId) {
         String filePath = "Полтавцев/Заняття 3/Козацькі угоди.pdf";
         sendPdfToUser(chatId, filePath);
-
-        ClassPathResource resource = new ClassPathResource(filePath);
-
-        List<File> imageFiles = new ArrayList<>();
-
-        try (InputStream pdfStream = resource.getInputStream()) {
-            try (PDDocument document = PDDocument.load(pdfStream)) {
-                PDFRenderer pdfRenderer = new PDFRenderer(document);
-                for (int page = 0; page < document.getNumberOfPages(); page++) {
-                    BufferedImage image = pdfRenderer.renderImageWithDPI(page, 300); // Render page to image
-
-                    // Compress image to appropriate size
-                    BufferedImage compressedImage = Thumbnails.of(image)
-                            .size(2048, 2048) // Set max resolution
-                            .outputQuality(0.7) // Set quality from 0 to 1
-                            .asBufferedImage();
-
-                    // Save the image as a temporary file
-                    File imageFile = new File("temp_image_" + page + ".png");
-                    ImageIO.write(compressedImage, "png", imageFile);
-                    imageFiles.add(imageFile);
-                }
-            }
-        } catch (IOException e) {
-            sendMsg(chatId, "\uD83D\uDE22 На жаль, нам не вдалося отримати Козацькі угоди");
-            System.out.println(e.getMessage());
-        }
-        sendImageAlbum(chatId, imageFiles, "Козацькі угоди");
+//
+//        ClassPathResource resource = new ClassPathResource(filePath);
+//
+//        List<File> imageFiles = new ArrayList<>();
+//
+//        try (InputStream pdfStream = resource.getInputStream()) {
+//            try (PDDocument document = PDDocument.load(pdfStream)) {
+//                PDFRenderer pdfRenderer = new PDFRenderer(document);
+//                for (int page = 0; page < document.getNumberOfPages(); page++) {
+//                    BufferedImage image = pdfRenderer.renderImageWithDPI(page, 300); // Render page to image
+//
+//                    // Compress image to appropriate size
+//                    BufferedImage compressedImage = Thumbnails.of(image)
+//                            .size(2048, 2048) // Set max resolution
+//                            .outputQuality(0.7) // Set quality from 0 to 1
+//                            .asBufferedImage();
+//
+//                    // Save the image as a temporary file
+//                    File imageFile = new File("temp_image_" + page + ".png");
+//                    ImageIO.write(compressedImage, "png", imageFile);
+//                    imageFiles.add(imageFile);
+//                }
+//            }
+//        } catch (IOException e) {
+//            sendMsg(chatId, "\uD83D\uDE22 На жаль, нам не вдалося отримати Козацькі угоди");
+//            System.out.println(e.getMessage());
+//        }
+//        sendImageAlbum(chatId, imageFiles, "Козацькі угоди");
     }
 
     private String getFilePath(int topicNumber, String type, boolean intensive, boolean nopersonalii) {
