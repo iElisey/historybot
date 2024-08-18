@@ -246,11 +246,9 @@ public class HistoryBot implements SpringLongPollingBot, LongPollingSingleThread
     }
 
     private void sendPdfToUser(Long chatId, String filePath) {
-        File pdfFile = new File(filePath);
-        System.out.println(pdfFile.exists());
         ClassPathResource pdfResource = new ClassPathResource(filePath);
-        try {
-            SendDocument sendDocument = new SendDocument(String.valueOf(chatId), new InputFile(pdfResource.getInputStream(), pdfResource.getFilename()));
+        try (InputStream inputStream = pdfResource.getInputStream()) {
+            SendDocument sendDocument = new SendDocument(String.valueOf(chatId), new InputFile(inputStream, pdfResource.getFilename()));
             telegramClient.execute(sendDocument);
         } catch (TelegramApiException | IOException e) {
             e.printStackTrace();
@@ -258,31 +256,38 @@ public class HistoryBot implements SpringLongPollingBot, LongPollingSingleThread
     }
 
     private List<File> extractImagesFromPDF(Long chatId, int topicNumber, String type) {
-
         String filePath = getFilePath(topicNumber, type, false);
         System.out.println(filePath);
-        try {
-            if (!new ClassPathResource(filePath).getFile().exists()) {
+
+        // Determine if the resource exists by checking its availability as an InputStream
+        ClassPathResource resource = new ClassPathResource(filePath);
+        try (InputStream inputStream = resource.getInputStream()) {
+            // If the first resource is not found, switch to the fallback path
+            if (inputStream.available() == 0) {
                 filePath = getFilePath(topicNumber, type, true);
+                resource = new ClassPathResource(filePath);
             }
         } catch (IOException e) {
-            sendMsg(chatId, "\uD83D\uDE22 На жаль, нам не вдалося отримати "+ type.toLowerCase()+" для теми " + topicNumber);
+            sendMsg(chatId, "\uD83D\uDE22 На жаль, нам не вдалося отримати " + type.toLowerCase() + " для теми " + topicNumber);
             throw new RuntimeException(e);
         }
+
         List<File> imageFiles = new ArrayList<>();
 
-
-        try (InputStream resource = new ClassPathResource(filePath).getInputStream()) {
-            try (PDDocument document = PDDocument.load(resource)) {
+        // Proceed with processing the PDF if the resource is found
+        try (InputStream pdfStream = resource.getInputStream()) {
+            try (PDDocument document = PDDocument.load(pdfStream)) {
                 PDFRenderer pdfRenderer = new PDFRenderer(document);
                 for (int page = 0; page < document.getNumberOfPages(); page++) {
-                    BufferedImage image = pdfRenderer.renderImageWithDPI(page, 300); // Рендеринг страницы в изображение
-                    // Сжатие изображения до подходящего размера
+                    BufferedImage image = pdfRenderer.renderImageWithDPI(page, 300); // Render page to image
+
+                    // Compress image to appropriate size
                     BufferedImage compressedImage = Thumbnails.of(image)
-                            .size(2048, 2048) // Установите максимальное разрешение
-                            .outputQuality(0.7) // Установите качество от 0 до 1
+                            .size(2048, 2048) // Set max resolution
+                            .outputQuality(0.7) // Set quality from 0 to 1
                             .asBufferedImage();
 
+                    // Save the image as a temporary file
                     File imageFile = new File("temp_image_" + page + ".png");
                     ImageIO.write(compressedImage, "png", imageFile);
                     imageFiles.add(imageFile);
@@ -290,7 +295,7 @@ public class HistoryBot implements SpringLongPollingBot, LongPollingSingleThread
             }
             sendPdfToUser(chatId, filePath);
         } catch (IOException e) {
-            sendMsg(chatId, "\uD83D\uDE22 На жаль, нам не вдалося отримати "+ type.toLowerCase()+" для теми " + topicNumber);
+            sendMsg(chatId, "\uD83D\uDE22 На жаль, нам не вдалося отримати " + type.toLowerCase() + " для теми " + topicNumber);
             e.printStackTrace();
         }
 
