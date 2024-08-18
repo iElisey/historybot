@@ -304,12 +304,12 @@ public class HistoryBot implements SpringLongPollingBot, LongPollingSingleThread
             try (PDDocument document = PDDocument.load(pdfStream)) {
                 PDFRenderer pdfRenderer = new PDFRenderer(document);
                 for (int page = 0; page < document.getNumberOfPages(); page++) {
-                    BufferedImage image = pdfRenderer.renderImageWithDPI(page, 300); // Render page to image
+                    BufferedImage image = pdfRenderer.renderImageWithDPI(page, 350); // Render page to image
 
                     // Compress image to appropriate size
                     BufferedImage compressedImage = Thumbnails.of(image)
                             .size(2048, 2048) // Set max resolution
-                            .outputQuality(0.7) // Set quality from 0 to 1
+                            .outputQuality(0.8) // Set quality from 0 to 1
                             .asBufferedImage();
 
                     // Save the image as a temporary file
