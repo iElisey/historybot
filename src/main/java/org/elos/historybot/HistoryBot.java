@@ -275,7 +275,7 @@ public class HistoryBot implements SpringLongPollingBot, LongPollingSingleThread
 
         // Check if the resource exists. If not, switch to the alternative path.
         try {
-            if (!resource.exists() && type == "Персоналії") {
+            if (!resource.exists() && type.equals("Персоналії")) {
                 filePath = getFilePath(topicNumber, type, false, false);
                 resource = new ClassPathResource(filePath);
                 if (!resource.isFile()) {
@@ -287,7 +287,7 @@ public class HistoryBot implements SpringLongPollingBot, LongPollingSingleThread
                     }
                 }
             }
-            if (!resource.exists()) {
+            else if (!resource.exists()) {
                 filePath = getFilePath(topicNumber, type, true, false);
                 resource = new ClassPathResource(filePath);
                 System.out.println(filePath);
@@ -298,13 +298,16 @@ public class HistoryBot implements SpringLongPollingBot, LongPollingSingleThread
             sendMsg(chatId, "\uD83D\uDE22 На жаль, нам не вдалося отримати " + type.toLowerCase() + " для теми " + topicNumber);
             throw new RuntimeException(e);
         }
+        sendPdfToUser(chatId, filePath);
 
-        try {
-            resource.getInputStream();
-        } catch (IOException e) {
-            sendMsg(chatId, "\uD83D\uDE22 На жаль, нам не вдалося отримати " + type.toLowerCase() + " для теми " + topicNumber);
-            throw new RuntimeException(e);
-        }
+//        try {
+//            resource.getInputStream();
+//        } catch (IOException e) {
+//            sendMsg(chatId, "\uD83D\uDE22 На жаль, нам не вдалося отримати " + type.toLowerCase() + " для теми " + topicNumber);
+//            throw new RuntimeException(e);
+//        }
+
+
         List<File> imageFiles = new ArrayList<>();
 //
 //        try (InputStream pdfStream = resource.getInputStream()) {
@@ -329,7 +332,6 @@ public class HistoryBot implements SpringLongPollingBot, LongPollingSingleThread
 //            sendMsg(chatId, "\uD83D\uDE22 На жаль, нам не вдалося отримати " + type.toLowerCase() + " для теми " + topicNumber);
 //            System.out.println(e.getMessage());
 //        }
-        sendPdfToUser(chatId, filePath);
 
         return imageFiles;
     }
