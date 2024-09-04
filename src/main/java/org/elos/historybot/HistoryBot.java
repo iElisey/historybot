@@ -1,8 +1,6 @@
 package org.elos.historybot;
 
-import net.coobird.thumbnailator.Thumbnails;
 import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.rendering.PDFRenderer;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.elos.historybot.model.User;
 import org.elos.historybot.service.UserService;
@@ -30,8 +28,6 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.Keyboard
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -132,7 +128,7 @@ public class HistoryBot implements SpringLongPollingBot, LongPollingSingleThread
 
     private void handleAdditionalCommands(Long chatId, String type) {
         int selectedTopic = userService.findByChatId(chatId).getSelectedTopic();
-        List<File> images = extractImagesFromPDF(chatId, selectedTopic, type);
+        handlePdf(chatId, selectedTopic, type);
         //new comment
 //        if (!images.isEmpty()) {
 //            sendImageAlbum(chatId, images, String.format("Тема " + selectedTopic + ". %s.", type));
@@ -265,75 +261,54 @@ public class HistoryBot implements SpringLongPollingBot, LongPollingSingleThread
             telegramClient.execute(sendDocument);
         } catch (TelegramApiException | IOException e) {
             e.printStackTrace();
+            sendMsg(chatId, "\uD83D\uDE22 Виникла помилка при надсиланні файлу " + pdfResource.getFilename());
         }
     }
 
-    private List<File> extractImagesFromPDF(Long chatId, int topicNumber, String type) {
+    private void handlePdf(Long chatId, int topicNumber, String type) {
         String filePath = getFilePath(topicNumber, type, false, true);
         System.out.println(filePath);
-        ClassPathResource resource = new ClassPathResource(filePath);
 
-        // Check if the resource exists. If not, switch to the alternative path.
         try {
-            if (!resource.exists() && type.equals("Персоналії")) {
-                filePath = getFilePath(topicNumber, type, false, false);
-                resource = new ClassPathResource(filePath);
-                if (!resource.isFile()) {
-                    filePath = getFilePath(topicNumber, type, true, false);
-                    resource = new ClassPathResource(filePath);
-                    if (!resource.exists() || !resource.getFile().exists()) {
-                        filePath = getFilePath(topicNumber, type, true, true);
-                        resource = new ClassPathResource(filePath);
-                    }
-                }
-            }
-            else if (!resource.exists()) {
-                filePath = getFilePath(topicNumber, type, true, false);
-                resource = new ClassPathResource(filePath);
-                System.out.println(filePath);
+            // Створюємо ресурс і перевіряємо його на існування.
+            ClassPathResource resource = new ClassPathResource(filePath);
 
+            if (!resource.exists()) {
+                // Використовуємо альтернативний шлях, якщо файл не знайдено.
+                filePath = getAlternativeFilePath(topicNumber, type);
+                resource = new ClassPathResource(filePath);
+            }
+
+            // Якщо ресурс існує, надсилаємо його користувачу.
+            if (resource.exists()) {
+                sendPdfToUser(chatId, filePath);
+            } else {
+                sendMsg(chatId, "\uD83D\uDE22 Файл "+type+" не знайдено для теми " + topicNumber);
             }
 
         } catch (Exception e) {
-            sendMsg(chatId, "\uD83D\uDE22 На жаль, нам не вдалося отримати " + type.toLowerCase() + " для теми " + topicNumber);
-            throw new RuntimeException(e);
+            e.printStackTrace();
+            sendMsg(chatId, "\uD83D\uDE22 Виникла помилка при обробці файлу для теми " + topicNumber);
         }
-        sendPdfToUser(chatId, filePath);
+    }
+    private String getAlternativeFilePath(int topicNumber, String type) {
+        // Змінюємо шлях залежно від типу і стану інтенсиву та Персоналій
+        if (type.equals("Персоналії")) {
+            String filePath = getFilePath(topicNumber, type, false, false);
+            ClassPathResource resource = new ClassPathResource(filePath);
 
-//        try {
-//            resource.getInputStream();
-//        } catch (IOException e) {
-//            sendMsg(chatId, "\uD83D\uDE22 На жаль, нам не вдалося отримати " + type.toLowerCase() + " для теми " + topicNumber);
-//            throw new RuntimeException(e);
-//        }
+            if (!resource.exists()) {
+                filePath = getFilePath(topicNumber, type, true, false);
+                resource = new ClassPathResource(filePath);
 
+                if (!resource.exists()) {
+                    filePath = getFilePath(topicNumber, type, true, true);
+                }
+            }
+            return filePath;
+        }
 
-        List<File> imageFiles = new ArrayList<>();
-//
-//        try (InputStream pdfStream = resource.getInputStream()) {
-//            try (PDDocument document = PDDocument.load(pdfStream)) {
-//                PDFRenderer pdfRenderer = new PDFRenderer(document);
-//                for (int page = 0; page < document.getNumberOfPages(); page++) {
-//                    BufferedImage image = pdfRenderer.renderImageWithDPI(page, 350); // Render page to image
-//
-//                    // Compress image to appropriate size
-//                    BufferedImage compressedImage = Thumbnails.of(image)
-//                            .size(2048, 2048) // Set max resolution
-//                            .outputQuality(0.8) // Set quality from 0 to 1
-//                            .asBufferedImage();
-//
-//                    // Save the image as a temporary file
-//                    File imageFile = new File("temp_image_" + page + ".png");
-//                    ImageIO.write(compressedImage, "png", imageFile);
-//                    imageFiles.add(imageFile);
-//                }
-//            }
-//        } catch (IOException e) {
-//            sendMsg(chatId, "\uD83D\uDE22 На жаль, нам не вдалося отримати " + type.toLowerCase() + " для теми " + topicNumber);
-//            System.out.println(e.getMessage());
-//        }
-
-        return imageFiles;
+        return getFilePath(topicNumber, type, true, false);
     }
 
     private void sendKozatskiYgodu(Long chatId) {
