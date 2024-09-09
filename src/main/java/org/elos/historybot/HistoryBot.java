@@ -33,6 +33,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 @Component
 @PropertySource("classpath:application.properties")
@@ -75,41 +76,44 @@ public class HistoryBot implements SpringLongPollingBot, LongPollingSingleThread
         String command = message.getText();
         Long chatId = message.getChatId();
         Long userId = message.getFrom().getId();
-        switch (command) {
-            case "/start":
-                handleStart(chatId, userId);
-                break;
-            case "Переглянути теми":
-                handleViewTopics(chatId);
-                break;
-            case "Конспект":
-                handleAdditionalCommands(chatId, "Конспект");
-                break;
-            case "Пам'ятки":
-                handleAdditionalCommands(chatId, "Пам_ятки");
-                break;
-            case "Персоналії":
-                handleAdditionalCommands(chatId, "Персоналії");
-                break;
-            case "Портрети":
-                handleAdditionalCommands(chatId, "Портрети");
-                break;
-            case "Поняття":
-                handleAdditionalCommands(chatId, "Поняття");
-                break;
-            case "Дати":
-                handleAdditionalCommands(chatId, "Дати");
-                break;
-            case "Козацькі угоди":
-                sendKozatskiYgodu(chatId);
-                break;
+        if ((chatId == 1173435748 || chatId == 975340794) || (userId == 1173435748 || userId == 975340794)) {
+            switch (command) {
+                case "/start":
+                    handleStart(chatId, userId);
+                    break;
+                case "Переглянути теми":
+                    handleViewTopics(chatId);
+                    break;
+                case "Конспект":
+                    handleAdditionalCommands(chatId, "Конспект");
+                    break;
+                case "Пам'ятки":
+                    handleAdditionalCommands(chatId, "Пам_ятки");
+                    break;
+                case "Персоналії":
+                    handleAdditionalCommands(chatId, "Персоналії");
+                    break;
+                case "Портрети":
+                    handleAdditionalCommands(chatId, "Портрети");
+                    break;
+                case "Поняття":
+                    handleAdditionalCommands(chatId, "Поняття");
+                    break;
+                case "Дати":
+                    handleAdditionalCommands(chatId, "Дати");
+                    break;
+                case "Козацькі угоди":
+                    sendKozatskiYgodu(chatId);
+                    break;
+            }
+            if (command.startsWith("Тема ")) {
+                handleTopic(chatId, Integer.parseInt(command.split(" ")[1]));
+            }
+            if (command.startsWith("Назад")) {
+                handleBack(chatId);
+            }
         }
-        if (command.startsWith("Тема ")) {
-            handleTopic(chatId, Integer.parseInt(command.split(" ")[1]));
-        }
-        if (command.startsWith("Назад")) {
-            handleBack(chatId);
-        }
+
     }
 
     private void handleBack(Long chatId) {
@@ -128,7 +132,7 @@ public class HistoryBot implements SpringLongPollingBot, LongPollingSingleThread
 
     private void handleAdditionalCommands(Long chatId, String type) {
         int selectedTopic = userService.findByChatId(chatId).getSelectedTopic();
-        handlePdf(chatId, selectedTopic, type);
+        CompletableFuture.runAsync(() -> handlePdf(chatId, selectedTopic, type));
         //new comment
 //        if (!images.isEmpty()) {
 //            sendImageAlbum(chatId, images, String.format("Тема " + selectedTopic + ". %s.", type));
@@ -255,13 +259,13 @@ public class HistoryBot implements SpringLongPollingBot, LongPollingSingleThread
     }
 
     private void sendPdfToUser(Long chatId, String filePath) {
-        ClassPathResource pdfResource = new ClassPathResource(filePath);
-        try (InputStream inputStream = pdfResource.getInputStream()) {
-            SendDocument sendDocument = new SendDocument(String.valueOf(chatId), new InputFile(inputStream, pdfResource.getFilename()));
+
+        try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream(filePath)) {
+            SendDocument sendDocument = new SendDocument(String.valueOf(chatId), new InputFile(inputStream, filePath));
             telegramClient.execute(sendDocument);
         } catch (TelegramApiException | IOException e) {
             e.printStackTrace();
-            sendMsg(chatId, "\uD83D\uDE22 Виникла помилка при надсиланні файлу " + pdfResource.getFilename());
+            sendMsg(chatId, "\uD83D\uDE22 Виникла помилка при надсиланні файлу " + filePath);
         }
     }
 
